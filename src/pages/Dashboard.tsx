@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, PanInfo } from 'motion/react';
+import { motion, PanInfo, AnimatePresence } from 'motion/react';
 import { Search, Plus, PenTool, Trash2 } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
 import {
@@ -18,6 +18,7 @@ export default function Dashboard({ user }: { user: any }) {
   const [creating, setCreating] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [dashboardView, setDashboardView] = useState<'moodboard' | 'whiteboard'>('moodboard');
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
 
   const wheelTimeout = useRef<number | null>(null);
 
@@ -255,15 +256,10 @@ export default function Dashboard({ user }: { user: any }) {
                 <ContextMenuContent className="w-40 bg-[#1a1a1a] border-white/10 text-white">
                   <ContextMenuItem 
                     variant="destructive"
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      if (window.confirm('Tem certeza que deseja deletar este projeto?')) {
-                        if (activeIndex >= carouselItems.length - 2) {
-                          setActiveIndex(Math.max(0, activeIndex - 1));
-                        }
-                        deleteProject(item.id);
-                      }
-                    }}
+                     onSelect={(e) => {
+                       e.preventDefault();
+                       setProjectToDelete(item.id);
+                     }}
                     className="text-red-500 focus:text-red-500 focus:bg-red-500/10 cursor-pointer"
                   >
                     Deletar
@@ -274,6 +270,54 @@ export default function Dashboard({ user }: { user: any }) {
           })}
         </div>
       </div>
+
+      <AnimatePresence>
+        {projectToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm pointer-events-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 10, opacity: 0 }}
+              className="bg-[#1a1a1a] border border-white/10 rounded-[2rem] p-8 w-full max-w-md flex flex-col gap-6 shadow-2xl"
+            >
+              <div>
+                <h3 className="text-xl font-bold text-white mb-2">Deletar projeto?</h3>
+                <p className="text-[#888] text-sm leading-relaxed">
+                  Tem certeza que deseja deletar este projeto? Esta ação não pode ser desfeita e todos os seus dados serão perdidos.
+                </p>
+              </div>
+              <div className="flex gap-3 justify-end mt-2">
+                <button
+                  onClick={() => setProjectToDelete(null)}
+                  className="px-5 py-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors text-sm font-bold uppercase tracking-wider"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    const idx = carouselItems.findIndex(p => p.id === projectToDelete);
+                    if (activeIndex >= carouselItems.length - 2) {
+                      setActiveIndex(Math.max(0, activeIndex - 1));
+                    } else if (idx < activeIndex) {
+                       setActiveIndex(Math.max(0, activeIndex - 1));
+                    }
+                    deleteProject(projectToDelete);
+                    setProjectToDelete(null);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-colors border border-red-500/30 hover:border-red-500 text-sm font-bold uppercase tracking-wider flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" /> Deletar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

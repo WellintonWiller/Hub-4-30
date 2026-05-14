@@ -8,7 +8,7 @@ export default function ProjectView({ user }: { user: any }) {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { project, assets, elements, cursors, updateTitle, addAsset, removeAsset, addElement, updateElement, removeElement, updateCursor, deleteProject } = useProject(projectId, user?.uid);
+  const { project, assets, elements, cursors, updateTitle, addAsset, removeAsset, updateAsset, addElement, updateElement, removeElement, updateCursor, deleteProject } = useProject(projectId, user?.uid);
   const [view, setView] = useState<'moodboard' | 'whiteboard'>(location.state?.defaultView || 'moodboard');
   
   useEffect(() => {
@@ -44,6 +44,8 @@ export default function ProjectView({ user }: { user: any }) {
         <Whiteboard 
            project={project} 
            assets={assets}
+           removeAsset={removeAsset}
+           updateAsset={updateAsset}
            elements={elements}
            cursors={cursors}
            addElement={addElement}

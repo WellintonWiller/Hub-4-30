@@ -65,6 +65,14 @@ export function useProject(projectId: string | undefined, userId: string | undef
     setAssets(updated);
   };
 
+  const updateAsset = async (assetId: string, updates: any) => {
+    if (!projectId) return;
+    const current: any = await localforage.getItem(`assets_${projectId}`) || [];
+    const updated = current.map((a: any) => a.id === assetId ? { ...a, ...updates } : a);
+    await localforage.setItem(`assets_${projectId}`, updated);
+    setAssets(updated);
+  };
+
   const addElement = async (elementData: any) => {
     if (!projectId) return;
     const current: any = await localforage.getItem(`elements_${projectId}`) || [];
@@ -111,6 +119,7 @@ export function useProject(projectId: string | undefined, userId: string | undef
     updateTitle,
     addAsset,
     removeAsset,
+    updateAsset,
     addElement,
     updateElement,
     removeElement,
