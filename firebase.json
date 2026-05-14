@@ -1,0 +1,6 @@
+{
+  "firestore": {
+    "database": "ai-studio-criativohub-93a5d34a-83ea-4591-815c-d2efc3e9fc8f",
+    "rules": "firestore.rules"
+  }
+}
