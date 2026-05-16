@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Moodboard from '../components/Moodboard';
 import Whiteboard from '../components/Whiteboard';
-import { PDFExport } from '../components/PDFExport';
 import { useProject } from '../hooks/useProject';
 
 import { SplashScreen } from '../components/SplashScreen';
@@ -13,7 +12,7 @@ export default function ProjectView({ user }: { user: any }) {
   const location = useLocation();
   const { 
     project, assets, elements, cursors, updateTitle, updateProject, addAsset, removeAsset, updateAsset, 
-    addElement, addElements, updateElement, updateElements, removeElement, updateCursor, deleteProject,
+    addElement, addElements, updateElement, removeElement, updateCursor, deleteProject,
     undo, redo, canUndo, canRedo, bringToFront, sendToBack 
   } = useProject(projectId, user?.uid);
   const [view, setView] = useState<'moodboard' | 'whiteboard'>(() => {
@@ -35,9 +34,6 @@ export default function ProjectView({ user }: { user: any }) {
     }
   }, [project]);
 
-  const [isPdfStudioOpen, setIsPdfStudioOpen] = useState(false);
-  const [triggerExport, setTriggerExport] = useState(false);
-
   if (!project) return <SplashScreen isLoading={true} />;
 
   const handleDeleteProject = async () => {
@@ -49,19 +45,6 @@ export default function ProjectView({ user }: { user: any }) {
 
   return (
     <>
-      {/* Hidden/Studio PDF Component */}
-      <PDFExport 
-        project={project} 
-        elements={elements} 
-        user={user} 
-        updateProject={updateProject} 
-        isOpen={isPdfStudioOpen}
-        onClose={() => setIsPdfStudioOpen(false)}
-        triggerExport={triggerExport}
-        onExportComplete={() => setTriggerExport(false)}
-        setView={setView}
-      />
-
       {view === 'moodboard' ? (
         <Moodboard 
            projectId={projectId!} 
@@ -74,8 +57,6 @@ export default function ProjectView({ user }: { user: any }) {
            user={user} 
            setView={setView} 
            deleteProject={handleDeleteProject}
-           elements={elements}
-           openPdfStudio={() => setIsPdfStudioOpen(true)}
         />
       ) : (
         <Whiteboard 
@@ -89,7 +70,6 @@ export default function ProjectView({ user }: { user: any }) {
            addElement={addElement}
            addElements={addElements}
            updateElement={updateElement}
-           updateElements={updateElements}
            removeElement={removeElement}
            updateCursor={updateCursor}
            updateTitle={updateTitle} 
@@ -102,7 +82,6 @@ export default function ProjectView({ user }: { user: any }) {
            canRedo={canRedo}
            bringToFront={bringToFront}
            sendToBack={sendToBack}
-           exportPdf={() => setTriggerExport(true)}
         />
       )}
     </>

@@ -1,6 +1,6 @@
 import { useState, useCallback, useId, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Search, LayoutGrid, LayoutPanelLeft, Filter, PenTool, X, Trash2, ChevronLeft, Layout } from 'lucide-react';
+import { Search, LayoutGrid, LayoutPanelLeft, Filter, PenTool, X, Trash2, ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { compressImage, blobToDataURL } from '../utils/media';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
@@ -10,7 +10,6 @@ import {
   ContextMenuContent,
   ContextMenuItem,
 } from './ui/context-menu';
-import { PDFExport } from './PDFExport';
 
 const LazyHoverGif = ({ src, poster, layoutId, className }: { src: string, poster: string, layoutId: string, className: string }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -26,7 +25,7 @@ const LazyHoverGif = ({ src, poster, layoutId, className }: { src: string, poste
   );
 };
 
-const LazyHoverVideo = ({ src, layoutId, className, onVideoRef }: { src: string, layoutId: string, className: string, onVideoRef?: (el: HTMLVideoElement | null) => void }) => {
+const LazyHoverVideo = ({ src, layoutId, className }: { src: string, layoutId: string, className: string }) => {
   const [isIntersecting, setIntersecting] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -45,7 +44,6 @@ const LazyHoverVideo = ({ src, layoutId, className, onVideoRef }: { src: string,
       {!isIntersecting && <span>Loading Video...</span>}
       {isIntersecting && (
          <motion.video 
-            ref={onVideoRef}
             layoutId={layoutId} 
             src={src} 
             loop 
@@ -61,91 +59,7 @@ const LazyHoverVideo = ({ src, layoutId, className, onVideoRef }: { src: string,
   );
 };
 
-const MoodboardItem = ({ p, generalId, setActiveMedia, updateProject, addAsset, removeAsset, user, project }: any) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  
-  const handleExportFrame = async () => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx?.drawImage(videoRef.current, 0, 0);
-      const dataUrl = canvas.toDataURL('image/webp', 0.9);
-      
-      await addAsset({
-        url: dataUrl,
-        type: 'image',
-        width: canvas.width,
-        height: canvas.height,
-        addedBy: user.uid,
-        name: `Frame from ${project?.name || 'video'}`
-      });
-    }
-  };
-
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <motion.div 
-          layoutId={`container-${generalId}-${p.key}`}
-          onClick={() => setActiveMedia(p)}
-          className={`relative inline-block w-full break-inside-avoid border border-transparent hover:border-[#FF4500] group overflow-hidden cursor-pointer ${p.layout === 'grid' ? 'aspect-square' : ''}`}
-        >
-          {p.type === 'video' ? (
-            <LazyHoverVideo 
-              onVideoRef={(el) => (videoRef.current as any) = el}
-              layoutId={`media-${generalId}-${p.key}`} 
-              src={p.src || ''} 
-              className={p.layout === 'grid' ? "absolute inset-0 w-full h-full object-cover transition-transform hover:scale-105 duration-700" : "w-full h-auto object-cover transition-transform hover:scale-105 duration-700"} 
-            />
-          ) : p.type === 'gif' ? (
-            <LazyHoverGif 
-              layoutId={`media-${generalId}-${p.key}`} 
-              src={p.src || ''} 
-              poster={p.poster || p.src} 
-              className={p.layout === 'grid' ? "absolute inset-0 w-full h-full object-cover transition-transform hover:scale-105 duration-700" : "w-full h-auto object-cover transition-transform hover:scale-105 duration-700"} 
-            />
-          ) : (
-            <motion.img 
-              layoutId={`media-${generalId}-${p.key}`} 
-              src={p.src || undefined} 
-              loading="lazy" 
-              className={p.layout === 'grid' ? "absolute inset-0 w-full h-full object-cover transition-transform hover:scale-105 duration-700" : "w-full h-auto object-cover transition-transform hover:scale-105 duration-700"} 
-            />
-          )}
-        </motion.div>
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-48" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
-        <ContextMenuItem 
-          onSelect={() => updateProject({ coverUrl: p.src })}
-          className="cursor-pointer"
-        >
-          Usar como capa
-        </ContextMenuItem>
-        {p.type === 'video' && (
-          <ContextMenuItem 
-            onSelect={handleExportFrame}
-            className="cursor-pointer text-[#FF4500]"
-          >
-            Exportar Frame (para PDF)
-          </ContextMenuItem>
-        )}
-        <ContextMenuItem 
-          variant="destructive" 
-          onSelect={() => removeAsset(p.id)}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onPointerUp={(e) => e.stopPropagation()}
-        >
-          Deletar
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-};
-
-export default function Moodboard({ projectId, project, assets = [], addAsset, removeAsset, updateTitle, updateProject, user, setView, deleteProject, elements = [], openPdfStudio }: any) {
+export default function Moodboard({ projectId, project, assets = [], addAsset, removeAsset, updateTitle, updateProject, user, setView, deleteProject }: any) {
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'image' | 'video'>('all');
@@ -422,6 +336,8 @@ export default function Moodboard({ projectId, project, assets = [], addAsset, r
       {/* Red Background Gradient coming from bottom to top */}
       <div className="fixed inset-0 pointer-events-none z-0" style={{ background: 'linear-gradient(to top, #ff2300 0%, #3a0900 15%, #121212 40%, #121212 100%)' }} />
 
+
+
       {/* Massive Background Typography */}
       <motion.div 
         className="fixed top-0 left-0 w-full px-16 pt-8 z-20 user-select-none"
@@ -462,9 +378,6 @@ export default function Moodboard({ projectId, project, assets = [], addAsset, r
             
             {/* Whiteboard Toggle & Delete Project */}
             <div className="flex items-center gap-2">
-              <button onClick={openPdfStudio} className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold bg-white/5 hover:bg-white/10 px-4 py-1.5 rounded-full transition-all">
-                <Layout className="w-4 h-4" /> PDF STUDIO
-              </button>
               <button onClick={(e) => { e.stopPropagation(); setView('whiteboard'); }} className="bg-[#FF4500] text-white hover:bg-[#FF4500]/80 h-7 px-4 rounded-full flex items-center text-[10px] uppercase tracking-widest font-black transition-all shadow-lg shadow-[#FF4500]/20">
                 <PenTool className="w-3 h-3 mr-2" /> WHITEBOARD
               </button>
@@ -482,6 +395,7 @@ export default function Moodboard({ projectId, project, assets = [], addAsset, r
         <div className="w-full pb-32">
         {filteredAssets.length === 0 && !uploading && (
            <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+             {/* Placeholders matching layout if empty */}
              {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="aspect-square bg-[#1a1a1a] transition-colors border border-transparent overflow-hidden relative"></div>
              ))}
@@ -490,35 +404,86 @@ export default function Moodboard({ projectId, project, assets = [], addAsset, r
 
         {filteredAssets.length > 0 && (layout === 'masonry' ? (
            <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
-              {photos.map((p: any) => (
-                <MoodboardItem 
-                  key={p.key} 
-                  p={p} 
-                  generalId={generalId} 
-                  setActiveMedia={setActiveMedia} 
-                  updateProject={updateProject} 
-                  addAsset={addAsset} 
-                  removeAsset={removeAsset} 
-                  user={user} 
-                  project={project} 
-                />
-              ))}
+             {photos.map((p: any) => (
+               <ContextMenu key={p.key}>
+                 <ContextMenuTrigger asChild>
+                   <motion.div 
+                     layoutId={`container-${generalId}-${p.key}`}
+                     onClick={() => setActiveMedia(p)}
+                     className="relative inline-block w-full break-inside-avoid border border-transparent hover:border-[#FF4500] group overflow-hidden cursor-pointer"
+                   >
+                     {p.type === 'video' ? (
+                       <LazyHoverVideo layoutId={`media-${generalId}-${p.key}`} src={p.src || ''} className="w-full h-auto object-cover transition-transform hover:scale-105 duration-700" />
+                     ) : p.type === 'gif' ? (
+                       <LazyHoverGif layoutId={`media-${generalId}-${p.key}`} src={p.src || ''} poster={p.poster || p.src} className="w-full h-auto object-cover transition-transform hover:scale-105 duration-700" />
+                     ) : (
+                       <motion.img layoutId={`media-${generalId}-${p.key}`} src={p.src || undefined} loading="lazy" className="w-full h-auto object-cover transition-transform hover:scale-105 duration-700" />
+                     )}
+                   </motion.div>
+                 </ContextMenuTrigger>
+                  <ContextMenuContent className="w-40" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => e.stopPropagation()}>
+                    <ContextMenuItem 
+                      onSelect={() => updateProject({ coverUrl: p.src })}
+                      className="cursor-pointer"
+                    >
+                      Usar como capa
+                    </ContextMenuItem>
+                    <ContextMenuItem 
+                      variant="destructive" 
+                      onSelect={() => removeAsset(p.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerUp={(e) => e.stopPropagation()}
+                    >
+                      Deletar
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+               </ContextMenu>
+             ))}
            </div>
         ) : (
            <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {photos.map((p: any) => (
-                <MoodboardItem 
-                  key={p.key} 
-                  p={{...p, layout: 'grid'}} 
-                  generalId={generalId} 
-                  setActiveMedia={setActiveMedia} 
-                  updateProject={updateProject} 
-                  addAsset={addAsset} 
-                  removeAsset={removeAsset} 
-                  user={user} 
-                  project={project} 
-                />
-              ))}
+             {photos.map((p: any) => (
+                <ContextMenu key={p.key}>
+                  <ContextMenuTrigger asChild>
+                    <motion.div 
+                      layoutId={`container-${generalId}-${p.key}`}
+                      onClick={() => setActiveMedia(p)}
+                      className="aspect-square bg-[#1a1a1a] transition-colors overflow-hidden relative border border-transparent hover:border-[#FF4500] cursor-pointer"
+                    >
+                     {p.type === 'video' ? (
+                       <LazyHoverVideo layoutId={`media-${generalId}-${p.key}`} src={p.src || ''} className="absolute inset-0 w-full h-full object-cover transition-transform hover:scale-105 duration-700" />
+                     ) : p.type === 'gif' ? (
+                       <LazyHoverGif layoutId={`media-${generalId}-${p.key}`} src={p.src || ''} poster={p.poster || p.src} className="absolute inset-0 w-full h-full object-cover transition-transform hover:scale-105 duration-700" />
+                     ) : (
+                       <motion.img layoutId={`media-${generalId}-${p.key}`} src={p.src || undefined} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform hover:scale-105 duration-700" />
+                     )}
+                    </motion.div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent 
+                    className="w-40"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                  >
+                    <ContextMenuItem 
+                      onSelect={() => updateProject({ coverUrl: p.src })}
+                      className="cursor-pointer"
+                    >
+                      Usar como capa
+                    </ContextMenuItem>
+                    <ContextMenuItem 
+                      variant="destructive" 
+                      onSelect={() => removeAsset(p.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerUp={(e) => e.stopPropagation()}
+                    >
+                      Deletar
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+             ))}
            </div>
         ))}
       </div>

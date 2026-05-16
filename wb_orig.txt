@@ -1,0 +1,494 @@
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Stage, Layer, Line, Text, Arrow, Image as KonvaImage, Group, Rect, Transformer } from 'react-konva';
+import { Pen, ArrowUpRight, Type, StickyNote, Search, Layout, Hand, MousePointer2, Eraser } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import useImage from 'use-image';
+
+// Asset renderer for Konva
+const URLImage = ({ image, x, y, width, height }: any) => {
+  const [img] = useImage(image.url || undefined, 'anonymous');
+  if (!img) return null;
+  return <KonvaImage image={img} x={x} y={y} width={width} height={height} draggable />;
+};
+
+export default function Whiteboard({ project, elements = [], cursors = [], assets = [], addElement, updateElement, removeElement, updateCursor, updateTitle, user, setView }: any) {
+  const [tool, setTool] = useState<'pen' | 'arrow' | 'text' | 'sticky' | 'select' | 'pan' | 'eraser'>('select');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentLine, setCurrentLine] = useState<any>(null);
+  const [currentArrow, setCurrentArrow] = useState<any>(null);
+  const [selectedColor, setSelectedColor] = useState('#FF4500');
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectionBox, setSelectionBox] = useState<any>(null);
+
+  const [stageProps, setStageProps] = useState({ scale: 1, x: 0, y: 0 });
+
+  const COLORS = ['#FF4500', '#00C853', '#2979FF', '#FFD600', '#FFFFFF', '#1A1B1E', '#9C27B0', '#FF4081'];
+  
+  const stageRef = useRef<any>(null);
+  const trRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (trRef.current && stageRef.current) {
+      const nodes = selectedIds
+        .map((id) => stageRef.current.findOne(`#el-${id}`))
+        .filter(Boolean);
+      trRef.current.nodes(nodes);
+      trRef.current.getLayer().batchDraw();
+    }
+  }, [selectedIds, elements]);
+
+  const getRelativePointerPosition = (stage: any) => {
+    const pointerPosition = stage.getPointerPosition();
+    if (!pointerPosition) return null;
+    const scale = stage.scaleX();
+    const x = (pointerPosition.x - stage.x()) / scale;
+    const y = (pointerPosition.y - stage.y()) / scale;
+    return { x, y };
+  };
+
+  const handleWheel = useCallback((e: any) => {
+    e.evt.preventDefault();
+    const scaleBy = 1.05;
+    const stage = e.target.getStage();
+    const oldScale = stage.scaleX();
+    const pointer = stage.getPointerPosition();
+
+    if (!pointer) return;
+
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
+    };
+
+    const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
+
+    setStageProps({
+      scale: newScale,
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    });
+  }, []);
+
+  const handleMouseMove = useCallback((e: any) => {
+    const stage = e.target.getStage();
+    const point = getRelativePointerPosition(stage);
+    if (!point) return;
+
+    if (Math.random() > 0.8) {
+      updateCursor({
+        x: point.x,
+        y: point.y,
+        displayName: user.displayName || 'Anon',
+        color: selectedColor
+      });
+    }
+
+    if (!isDrawing) {
+      if (tool === 'select' && selectionBox) {
+        setSelectionBox({
+          ...selectionBox,
+          x: Math.min(point.x, selectionBox.startX),
+          y: Math.min(point.y, selectionBox.startY),
+          width: Math.abs(point.x - selectionBox.startX),
+          height: Math.abs(point.y - selectionBox.startY),
+        });
+      } else if (tool === 'eraser' && e.evt.buttons === 1) {
+        // Eraser drag to delete
+        const isElement = e.target !== e.target.getStage();
+        if (isElement && e.target.attrs.id) {
+          const id = e.target.attrs.id.replace('el-', '');
+          removeElement(id);
+        }
+      }
+      return;
+    }
+
+    if (tool === 'pen' && currentLine) {
+      setCurrentLine({ ...currentLine, points: currentLine.points.concat([point.x, point.y]) });
+    } else if (tool === 'arrow' && currentArrow) {
+      setCurrentArrow({ ...currentArrow, points: [currentArrow.points[0], currentArrow.points[1], point.x, point.y] });
+    }
+  }, [user, isDrawing, tool, currentLine, currentArrow, selectedColor, updateCursor]);
+
+  const handleMouseDown = (e: any) => {
+    const stage = e.target.getStage();
+    const isElement = e.target !== stage;
+    
+    // Eraser on click
+    if (tool === 'eraser') {
+      if (isElement && e.target.attrs.id) {
+        const id = e.target.attrs.id.replace('el-', '');
+        removeElement(id);
+      }
+      return;
+    }
+
+    if (tool === 'select') {
+      const isTransformer = e.target.getParent()?.className === 'Transformer';
+      if (isTransformer) return;
+
+      const point = getRelativePointerPosition(stage);
+      if (!point) return;
+
+      if (!isElement) {
+        // start selection box
+        setSelectionBox({
+          startX: point.x,
+          startY: point.y,
+          x: point.x,
+          y: point.y,
+          width: 0,
+          height: 0,
+        });
+        setSelectedIds([]);
+      } else {
+        const id = e.target.attrs.id?.replace('el-', '');
+        if (id) {
+          const metaPressed = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+          const isSelected = selectedIds.indexOf(id) >= 0;
+          if (!metaPressed && !isSelected) {
+            setSelectedIds([id]);
+          } else if (metaPressed && isSelected) {
+            setSelectedIds(selectedIds.filter((elId) => elId !== id));
+          } else if (metaPressed && !isSelected) {
+            setSelectedIds([...selectedIds, id]);
+          }
+        }
+      }
+      return;
+    }
+
+    // Allow panning if clicking on background, or tool is pan
+    if (tool === 'pan') {
+       return;
+    }
+
+    const point = getRelativePointerPosition(stage);
+    if (!point) return;
+
+    if (tool === 'pen') {
+      setIsDrawing(true);
+      setCurrentLine({ type: 'path', points: [point.x, point.y], color: selectedColor });
+    } else if (tool === 'arrow') {
+      setIsDrawing(true);
+      setCurrentArrow({ type: 'arrow', points: [point.x, point.y, point.x, point.y], color: selectedColor });
+    } else if (tool === 'text') {
+      const text = window.prompt("Type your text:");
+      if (text) {
+        addElement({
+          type: 'text',
+          x: point.x,
+          y: point.y,
+          text,
+          color: selectedColor,
+          addedBy: user.uid,
+        });
+      }
+      setTool('select');
+    } else if (tool === 'sticky') {
+      const text = window.prompt("Sticky note text:");
+      if (text) {
+        addElement({
+          type: 'sticky',
+          x: point.x,
+          y: point.y,
+          text,
+          color: selectedColor,
+          addedBy: user.uid,
+          width: 200,
+          height: 200,
+        });
+      }
+      setTool('select');
+    }
+  };
+
+  const handleMouseUp = async (e: any) => {
+    if (tool === 'select' && selectionBox) {
+      const box = selectionBox;
+      const stage = e.target.getStage();
+      
+      const newSelectedIds: string[] = [];
+      elements.forEach((el: any) => {
+        const node = stage.findOne(`#el-${el.id}`);
+        if (node) {
+          const clientRect = node.getClientRect({ relativeTo: stage });
+          const nodeRectRelative = {
+             x: (clientRect.x - stage.x()) / stage.scaleX(),
+             y: (clientRect.y - stage.y()) / stage.scaleX(),
+             width: clientRect.width / stage.scaleX(),
+             height: clientRect.height / stage.scaleX(),
+          };
+          
+          if (
+            nodeRectRelative.x >= box.x &&
+            nodeRectRelative.y >= box.y &&
+            nodeRectRelative.x + nodeRectRelative.width <= box.x + box.width &&
+            nodeRectRelative.y + nodeRectRelative.height <= box.y + box.height
+          ) {
+            newSelectedIds.push(el.id);
+          }
+        }
+      });
+      setSelectedIds(newSelectedIds);
+      setSelectionBox(null);
+      return;
+    }
+
+    if (tool === 'pen' && isDrawing && currentLine) {
+      setIsDrawing(false);
+      await addElement({
+        ...currentLine,
+        addedBy: user.uid,
+      });
+      setCurrentLine(null);
+    } else if (tool === 'arrow' && isDrawing && currentArrow) {
+      setIsDrawing(false);
+      await addElement({
+        ...currentArrow,
+        addedBy: user.uid,
+      });
+      setCurrentArrow(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const assetData = e.dataTransfer.getData('asset');
+    if (assetData && stageRef.current) {
+      const asset = JSON.parse(assetData);
+      
+      stageRef.current.setPointersPositions(e);
+      const pos = getRelativePointerPosition(stageRef.current);
+      
+      if (pos) {
+        addElement({
+          type: 'image',
+          x: pos.x,
+          y: pos.y,
+          url: asset.url,
+          width: 300,
+          height: asset.height ? (300 * asset.height) / asset.width : 200,
+          addedBy: user.uid,
+        });
+      }
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 z-0 bg-[#1a1b1e] overflow-hidden flex font-sans text-white" ref={containerRef}>
+       
+       {/* Dot Grid Background */}
+       <div className="absolute inset-0 z-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1.5px, transparent 1.5px)', backgroundSize: '60px 60px' }} />
+
+       {/* Left side asset panel */}
+       <div className="absolute top-24 left-6 bottom-24 w-64 bg-[#2b2d31]/90 backdrop-blur-md border border-white/5 rounded-2xl z-40 p-4 flex flex-col pointer-events-auto shadow-2xl">
+         <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#888] mb-4 ml-2">Assets</h3>
+         <div className="flex-1 overflow-y-auto no-scrollbar grid grid-cols-2 gap-3">
+           {assets.filter((a: any) => a.type === 'image').map((asset: any) => (
+             <div 
+               key={asset.id} 
+               className="aspect-square bg-[#1a1b1e] rounded-lg overflow-hidden cursor-grab active:cursor-grabbing border border-transparent hover:border-[#FF4500] transition-colors shadow-sm"
+               draggable
+               onDragStart={(e) => {
+                 e.dataTransfer.setData('asset', JSON.stringify(asset));
+               }}
+             >
+                <img src={asset.url || undefined} alt="" className="w-full h-full object-cover pointer-events-none" />
+             </div>
+           ))}
+         </div>
+       </div>
+
+       <div className="flex-1 relative"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+       >
+         <Stage 
+            width={window.innerWidth} 
+            height={window.innerHeight}
+            onMouseDown={handleMouseDown}
+            onMousemove={handleMouseMove}
+            onMouseup={handleMouseUp}
+            onWheel={handleWheel}
+            draggable={tool === 'select' || tool === 'pan'}
+            onDragEnd={(e) => {
+              // Update stage pos if stage itself was dragged
+              if (e.target === e.target.getStage()) {
+                 setStageProps(prev => ({ ...prev, x: e.target.x(), y: e.target.y() }));
+              } else if (tool === 'select') {
+                const id = e.target.attrs.id?.replace('el-', '');
+                if (id) {
+                  updateElement(id, { x: e.target.x(), y: e.target.y() });
+                }
+              }
+            }}
+            scaleX={stageProps.scale}
+            scaleY={stageProps.scale}
+            x={stageProps.x}
+            y={stageProps.y}
+            ref={stageRef}
+            style={{ cursor: tool === 'pen' ? 'crosshair' : tool === 'text' ? 'text' : tool === 'pan' ? 'grab' : tool === 'eraser' ? 'crosshair' : 'default', position: 'absolute', top:0, left:0, zIndex: 10 }}
+            onClick={(e) => {
+              if (tool === 'select' && e.target === e.target.getStage()) {
+                setSelectedIds([]);
+              }
+            }}
+         >
+            <Layer>
+               {elements.map((el: any) => {
+                  if (el.type === 'path') {
+                    return <Line key={el.id} id={`el-${el.id}`} points={el.points} stroke={el.color || '#fff'} strokeWidth={2 / stageProps.scale} tension={0.5} lineCap="round" lineJoin="round" x={el.x || 0} y={el.y || 0} scaleX={el.scaleX || 1} scaleY={el.scaleY || 1} rotation={el.rotation || 0} draggable={tool === 'select' && selectedIds.includes(el.id)} />;
+                  }
+                  if (el.type === 'text') {
+                    return <Text key={el.id} id={`el-${el.id}`} x={el.x} y={el.y} scaleX={el.scaleX || 1} scaleY={el.scaleY || 1} rotation={el.rotation || 0} text={el.text} fontSize={16} fill={el.color || '#fff'} fontFamily="Helvetica Neue" fontStyle="bold" draggable={tool === 'select' && selectedIds.includes(el.id)} />;
+                  }
+                  if (el.type === 'image') {
+                    return <URLImage key={el.id} id={`el-${el.id}`} image={el} x={el.x || 0} y={el.y || 0} scaleX={el.scaleX || 1} scaleY={el.scaleY || 1} rotation={el.rotation || 0} width={el.width} height={el.height} draggable={tool === 'select' && selectedIds.includes(el.id)} />;
+                  }
+                  if (el.type === 'arrow') {
+                    return <Arrow key={el.id} id={`el-${el.id}`} points={el.points} x={el.x || 0} y={el.y || 0} scaleX={el.scaleX || 1} scaleY={el.scaleY || 1} rotation={el.rotation || 0} fill={el.color || '#fff'} stroke={el.color || '#fff'} strokeWidth={4 / stageProps.scale} pointerLength={10 / stageProps.scale} pointerWidth={10 / stageProps.scale} draggable={tool === 'select' && selectedIds.includes(el.id)} />;
+                  }
+                  if (el.type === 'sticky') {
+                    return (
+                      <Group key={el.id} id={`el-${el.id}`} x={el.x} y={el.y} scaleX={el.scaleX || 1} scaleY={el.scaleY || 1} rotation={el.rotation || 0} draggable={tool === 'select' && selectedIds.includes(el.id)}>
+                        <Rect width={el.width} height={el.height} fill={el.color || '#FDE68A'} shadowColor="rgba(0,0,0,0.2)" shadowBlur={10} shadowOffset={{ x: 5, y: 5 }} cornerRadius={4} />
+                        <Text width={el.width - 20} height={el.height - 20} x={10} y={10} text={el.text} fill="#000" fontSize={16} fontFamily="Helvetica Neue" wrap="word" />
+                      </Group>
+                    );
+                  }
+                  return null;
+               })}
+
+               {currentLine && (
+                 <Line points={currentLine.points} stroke={currentLine.color} strokeWidth={2 / stageProps.scale} tension={0.5} lineCap="round" lineJoin="round" />
+               )}
+               {currentArrow && (
+                 <Arrow points={currentArrow.points} fill={currentArrow.color} stroke={currentArrow.color} strokeWidth={4 / stageProps.scale} pointerLength={10 / stageProps.scale} pointerWidth={10 / stageProps.scale} />
+               )}
+
+               {selectionBox && (
+                 <Rect 
+                   x={selectionBox.x} 
+                   y={selectionBox.y} 
+                   width={selectionBox.width} 
+                   height={selectionBox.height} 
+                   fill="rgba(0,161,255,0.3)" 
+                   stroke="#00A1FF" 
+                   strokeWidth={1 / stageProps.scale} 
+                 />
+               )}
+
+               {tool === 'select' && (
+                 <Transformer 
+                   ref={trRef} 
+                   boundBoxFunc={(oldBox, newBox) => {
+                     if (Math.abs(newBox.width) < 5 || Math.abs(newBox.height) < 5) return oldBox;
+                     return newBox;
+                   }}
+                   onTransformEnd={(e) => {
+                     trRef.current.nodes().forEach((n: any) => {
+                       const id = n.attrs.id?.replace('el-', '');
+                       if (id) {
+                         updateElement(id, {
+                           x: n.x(),
+                           y: n.y(),
+                           scaleX: n.scaleX(),
+                           scaleY: n.scaleY(),
+                           rotation: n.rotation(),
+                         });
+                       }
+                     });
+                   }}
+                 />
+               )}
+
+               {cursors.map((cursor: any) => (
+                  <React.Fragment key={cursor.id}>
+                    <Arrow points={[cursor.x, cursor.y, cursor.x + 12 / stageProps.scale, cursor.y + 16 / stageProps.scale]} fill={cursor.color} stroke={cursor.color} strokeWidth={2 / stageProps.scale} pointerLength={4 / stageProps.scale} pointerWidth={4 / stageProps.scale} />
+                    <Text x={cursor.x + 15 / stageProps.scale} y={cursor.y + 15 / stageProps.scale} text={cursor.displayName} fill="#fff" fontSize={10 / stageProps.scale} padding={2} />
+                  </React.Fragment>
+               ))}
+            </Layer>
+         </Stage>
+
+         {/* Top UI Layer */}
+         <div className="absolute top-10 w-full px-12 flex justify-between items-center pointer-events-none z-50">
+            {/* Top Left: Spacer */}
+            <div className="w-64"></div>
+
+            {/* Top Center: Project Title */}
+            <div className="flex-1 flex justify-center pointer-events-auto">
+              <input 
+                 className="bg-transparent text-[#888] font-bold uppercase tracking-widest text-lg outline-none text-center hover:text-white transition-colors w-96 placeholder-[#888]/50"
+                 value={project?.name || ''}
+                 onChange={(e) => updateTitle(e.target.value)}
+                 placeholder="NOME DO PROJETO"
+              />
+            </div>
+
+            {/* Top Right: Asset Sidebar Toggle / Switch / User */}
+            <div className="flex items-center justify-end w-64 gap-4 pointer-events-auto">
+               <button onClick={() => setView('moodboard')} className="h-10 px-4 rounded-full border border-white/20 text-white/50 flex items-center hover:text-white hover:border-white/50 transition-all font-bold text-[10px] tracking-widest uppercase">
+                 <Layout className="w-3 h-3 mr-2" /> Moodboard
+               </button>
+               <img src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`} alt="User" className="w-10 h-10 rounded-full border border-white/20 grayscale hover:grayscale-0 cursor-pointer" onClick={() => navigate('/')} />
+            </div>
+         </div>
+
+         {/* Floating Bottom Toolbar */}
+         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-[#2b2d31]/90 backdrop-blur-md border border-white/5 px-6 py-3 rounded-2xl pointer-events-auto shadow-2xl">
+            <ToolbarButton icon={<MousePointer2 className="w-5 h-5" />} active={tool === 'select'} onClick={() => setTool('select')} />
+            <ToolbarButton icon={<Hand className="w-5 h-5" />} active={tool === 'pan'} onClick={() => setTool('pan')} />
+            <div className="w-[1px] h-6 bg-white/10 mx-2" />
+            <ToolbarButton icon={<Pen className="w-5 h-5" />} active={tool === 'pen'} onClick={() => setTool('pen')} />
+            <ToolbarButton icon={<ArrowUpRight className="w-5 h-5" />} active={tool === 'arrow'} onClick={() => setTool('arrow')} />
+            <ToolbarButton icon={<StickyNote className="w-5 h-5" />} active={tool === 'sticky'} onClick={() => setTool('sticky')} />
+            <ToolbarButton icon={<Type className="w-5 h-5" />} active={tool === 'text'} onClick={() => setTool('text')} />
+            <ToolbarButton icon={<Eraser className="w-5 h-5" />} active={tool === 'eraser'} onClick={() => setTool('eraser')} />
+            <div className="w-[1px] h-6 bg-white/10 mx-2" />
+            
+            <div className="relative">
+              <div 
+                className="w-6 h-6 ml-2 rounded-full border-[3px] hover:scale-110 transition-transform cursor-pointer shadow-sm" 
+                style={{ backgroundColor: selectedColor, borderColor: '#fff' }}
+                onClick={() => setShowColorPicker(!showColorPicker)}
+              />
+              {showColorPicker && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 bg-[#2b2d31] border border-white/10 p-2 rounded-2xl shadow-xl flex gap-2">
+                  {COLORS.map(c => (
+                    <div 
+                      key={c}
+                      onClick={() => { setSelectedColor(c); setShowColorPicker(false); }}
+                      className={`w-6 h-6 rounded-full cursor-pointer hover:scale-110 transition-transform ${selectedColor === c ? 'ring-2 ring-white ring-offset-2 ring-offset-[#2b2d31]' : ''}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+         </div>
+
+         {/* Bottom Right Logo */}
+         <div className="absolute bottom-10 right-10 z-20 pointer-events-none text-right opacity-40 flex flex-col items-end">
+           <div className="font-bold text-3xl leading-none tracking-tighter text-white">{Math.round(stageProps.scale * 100)}%</div>
+         </div>
+       </div>
+    </div>
+  );
+}
+
+function ToolbarButton({ icon, active, onClick }: any) {
+  return (
+    <div 
+      onClick={onClick}
+      className={`p-2 rounded-xl cursor-pointer transition-colors ${active ? 'bg-[#FF4500] text-white' : 'hover:bg-white/10 text-white/60'}`}
+    >
+      {icon}
+    </div>
+  );
+}

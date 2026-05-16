@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import Konva from 'konva';
 import { Stage, Layer, Rect, Circle, Line, Text, Image as KonvaImage, Arrow, Group, Transformer } from 'react-konva';
-import { MousePointer2, Hand, Pen, Eraser, Square, Circle as CircleIcon, ArrowRight, ArrowLeftRight, Type, StickyNote, LayoutGrid, Palette, Trash2, Copy, X, CheckSquare, Zap, ChevronLeft, Undo2, Redo2, ArrowUpSquare, ArrowDownSquare, Lock, Unlock, Underline, RefreshCw, MoreVertical, Plus, Minus, Pipette, Maximize, Download } from 'lucide-react';
+import { MousePointer2, Hand, Pen, Eraser, Square, Circle as CircleIcon, ArrowRight, ArrowLeftRight, Type, StickyNote, LayoutGrid, Palette, Trash2, Copy, X, CheckSquare, Zap, ChevronLeft, Undo2, Redo2, ArrowUpSquare, ArrowDownSquare, Lock, Unlock, Underline, RefreshCw, MoreVertical, Plus, Minus, Map, Pipette } from 'lucide-react';
 import useImage from 'use-image';
 import { motion, AnimatePresence } from 'motion/react';
 import { compressImage, blobToDataURL } from '../utils/media';
 import { SplashScreen } from './SplashScreen';
-import { PDFExport } from './PDFExport';
 
 // --- TYPES ---
 export type Tool = 'select' | 'pan' | 'pen' | 'highlighter' | 'laser' | 'eraser' | 'rect' | 'ellipse' | 'arrow' | 'text' | 'sticky' | 'column' | 'color';
@@ -55,7 +54,7 @@ const URLImage = ({ image, x, y, width, height, id, ...props }: any) => {
   );
 };
 
-const KonvaVideo = ({ element, onRegister, onUnregister, ...props }: any) => {
+const KonvaVideo = ({ element, ...props }: any) => {
   const [videoObj, setVideoObj] = useState<HTMLVideoElement | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const imageRef = useRef<any>(null);
@@ -68,16 +67,12 @@ const KonvaVideo = ({ element, onRegister, onUnregister, ...props }: any) => {
     vid.preload = 'auto';
     vid.crossOrigin = 'Anonymous';
     vid.currentTime = 0.1; // Seek to first frame
-    vid.onloadeddata = () => {
-      setVideoObj(vid);
-      if (onRegister) onRegister(element.id, vid);
-    };
+    vid.onloadeddata = () => setVideoObj(vid);
     return () => {
       vid.pause();
       vid.src = '';
-      if (onUnregister) onUnregister(element.id);
     };
-  }, [element.url, element.id, onRegister, onUnregister]);
+  }, [element.url]);
 
   useEffect(() => {
     if (!videoObj) return;
@@ -280,43 +275,11 @@ const KonvaColorSwatch = ({ element, updateElement, onOpenColorPicker, ...props 
 };
 
 // --- MEMOIZED COMPONENTS ---
-const WhiteboardElement = React.memo(({ el, elements, isSelected, tool, editingTextId, editingItemIdx, setEditingTextId, setEditValue, setEditingItemIdx, setEditingElementDragging, setSelectedIds, setItemEditValue, setPlayingYoutubeId, updateElement, stageProps, stageRef, onOpenColorPicker, onRegisterVideo, onUnregisterVideo }: any) => {
-  const dragProps = useMemo(() => ({
-    draggable: tool === 'select' && !el.locked,
-    dragDistance: 5,
-    onDragStart: () => {
-      setEditingElementDragging(true);
-      if (tool === 'select' && !isSelected) {
-        setSelectedIds([el.id]);
-      }
-    },
-    onDragEnd: () => {
-      setEditingElementDragging(false);
-    }
-  }), [tool, el.locked, el.id, isSelected, setEditingElementDragging, setSelectedIds]);
-
-  const editableProps = useMemo(() => ({
-    onDblClick: () => {
-      if (['text', 'sticky', 'column'].includes(el.type)) {
-        setEditingTextId(el.id);
-        setEditValue(['sticky', 'column'].includes(el.type) ? (el.title || '') + '\n' + (el.body || '') : el.text);
-      }
-    },
-    onDblTap: () => {
-      if (['text', 'sticky', 'column'].includes(el.type)) {
-        setEditingTextId(el.id);
-        setEditValue(['sticky', 'column'].includes(el.type) ? (el.title || '') + '\n' + (el.body || '') : el.text);
-      }
-    },
-  }), [el.type, el.id, el.title, el.body, el.text, setEditingTextId, setEditValue]);
-
-  if (el.type === 'path') return <Line key={el.id} id={`el-${el.id}`} points={el.points} stroke={el.stroke} strokeWidth={el.strokeWidth} tension={0.5} lineCap="round" lineJoin="round" {...dragProps} />;
-  if (el.type === 'highlighter') return <Line key={el.id} id={`el-${el.id}`} points={el.points} stroke={el.stroke} strokeWidth={el.strokeWidth || 30} tension={0.5} lineCap="square" lineJoin="round" opacity={0.4} {...dragProps} />;
-
+const WhiteboardElement = React.memo(({ el, elements, isSelected, tool, dragProps, editableProps, editingTextId, editingItemIdx, setEditingTextId, setEditValue, setEditingItemIdx, setItemEditValue, setPlayingYoutubeId, updateElement, stageProps, stageRef, onOpenColorPicker }: any) => {
   if (el.type === 'rect') return <Rect key={el.id} id={`el-${el.id}`} x={el.x} y={el.y} width={el.width} height={el.height} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} cornerRadius={8} dash={el.dashStyle === 'dashed' ? [10, 10] : []} {...dragProps} />;
   if (el.type === 'ellipse') return <Circle key={el.id} id={`el-${el.id}`} x={el.x} y={el.y} radius={Math.abs(el.width || 0) / 2} fill={el.fill} stroke={el.stroke} strokeWidth={el.strokeWidth} dash={el.dashStyle === 'dashed' ? [10, 10] : []} {...dragProps} />;
   if (el.type === 'image') return <URLImage key={el.id} id={el.id} image={el} x={el.x} y={el.y} width={el.width} height={el.height} {...dragProps} />;
-  if (el.type === 'video') return <KonvaVideo key={el.id} element={el} onRegister={onRegisterVideo} onUnregister={onUnregisterVideo} {...dragProps} />;
+  if (el.type === 'video') return <KonvaVideo key={el.id} element={el} {...dragProps} />;
   if (el.type === 'gif') return <KonvaGif key={el.id} element={el} {...dragProps} />;
   if (el.type === 'youtube') return <KonvaYoutube key={el.id} element={el} setPlayingYoutubeId={setPlayingYoutubeId} {...dragProps} />;
   if (el.type === 'color') return <KonvaColorSwatch key={el.id} element={el} updateElement={updateElement} onOpenColorPicker={onOpenColorPicker} {...dragProps} />;
@@ -534,7 +497,7 @@ const ColumnEditor = ({ el, stageProps, initialValue, onSave }: any) => {
   );
 };
 
-export default function Whiteboard({ project, elements = [], addElement, addElements, updateElement, updateElements, removeElement, undo, redo, canUndo, canRedo, setView, addAsset, removeAsset, assets = [], user, updateTitle, updateProject, bringToFront, sendToBack, exportPdf }: any) {
+export default function Whiteboard({ project, elements = [], addElement, addElements, updateElement, removeElement, undo, redo, canUndo, canRedo, setView, addAsset, removeAsset, assets = [], user, updateTitle, updateProject, bringToFront, sendToBack }: any) {
   const navigate = useNavigate();
   const [tool, setTool] = useState<Tool>('select');
   const [activeColor, setActiveColor] = useState(COLORS.white);
@@ -550,14 +513,6 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, stageX?: number, stageY?: number, type?: 'element' | 'canvas' } | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-
-  const sortedElements = useMemo(() => {
-    return [...elements].sort((a: any, b: any) => {
-      if (a.type === 'column' && b.type !== 'column') return -1;
-      if (a.type !== 'column' && b.type === 'column') return 1;
-      return 0;
-    });
-  }, [elements]);
   const [editingItemIdx, setEditingItemIdx] = useState<number | null>(null);
   const [itemEditValue, setItemEditValue] = useState<string>('');
   const [playingYoutubeId, setPlayingYoutubeId] = useState<string | null>(null);
@@ -567,18 +522,26 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
   const [currentShape, setCurrentShape] = useState<any>(null);
   const [laserTrail, setLaserTrail] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDraggingElement, setIsDraggingElement] = useState(false);
-  const [showMenuDelayed, setShowMenuDelayed] = useState(false);
+  const [showMinimap, setShowMinimap] = useState(true);
   const [floatingColorPicker, setFloatingColorPicker] = useState<{ id: string; color: string; x: number; y: number } | null>(null);
-  const videoElementsRef = useRef<Map<string, HTMLVideoElement>>(new Map());
 
-  const registerVideo = useCallback((id: string, el: HTMLVideoElement) => {
-    videoElementsRef.current.set(id, el);
-  }, []);
+  // --- MINIMAP CALCS ---
+  const minimapSize = 180;
+  const boardBounds = useMemo(() => {
+    if (elements.length === 0) return { x: -1000, y: -1000, width: 2000, height: 2000 };
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const e of elements) {
+      const ex = e.x || 0, ey = e.y || 0, ew = e.width || 100, eh = e.height || 100;
+      if (ex < minX) minX = ex;
+      if (ex + ew > maxX) maxX = ex + ew;
+      if (ey < minY) minY = ey;
+      if (ey + eh > maxY) maxY = ey + eh;
+    }
+    const padding = 500;
+    return { x: minX - padding, y: minY - padding, width: (maxX - minX) + padding * 2, height: (maxY - minY) + padding * 2 };
+  }, [elements]);
 
-  const unregisterVideo = useCallback((id: string) => {
-    videoElementsRef.current.delete(id);
-  }, []);
+  const minimapScale = useMemo(() => Math.min(minimapSize / boardBounds.width, minimapSize / boardBounds.height), [boardBounds]);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 1500);
@@ -591,16 +554,6 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
   const processedAssetsRef = useRef<Set<string>>(new Set());
 
   const [showShapesMenu, setShowShapesMenu] = useState(false);
-
-  // Menu delay logic
-  useEffect(() => {
-    if (selectedIds.length > 0 && !isDraggingElement) {
-      const timer = setTimeout(() => setShowMenuDelayed(true), 150);
-      return () => clearTimeout(timer);
-    } else {
-      setShowMenuDelayed(false);
-    }
-  }, [selectedIds, isDraggingElement]);
   const [showDrawMenu, setShowDrawMenu] = useState(false);
   const [showStickyMenu, setShowStickyMenu] = useState(false);
 
@@ -1172,16 +1125,14 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
           />
         </div>
 
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <PDFExport project={project} elements={elements} user={user} />
-          <button
-            onClick={() => setView('moodboard')}
-            className="bg-[#1a1a1a]/95 backdrop-blur-md px-6 py-2.5 rounded-full border border-white/10 hover:border-[#FF4500]/50 hover:bg-white/5 transition-all flex items-center gap-3 text-white font-bold shadow-2xl"
-          >
-            <LayoutGrid className="w-5 h-5 text-white/70" />
-            <span>Moodboard</span>
-          </button>
-        </div>
+        {/* Right: Switch to Moodboard */}
+        <button
+          onClick={() => setView('moodboard')}
+          className="pointer-events-auto bg-[#1a1a1a]/95 backdrop-blur-md px-6 py-2.5 rounded-full border border-white/10 hover:border-[#FF4500]/50 hover:bg-white/5 transition-all flex items-center gap-3 text-white font-bold shadow-2xl"
+        >
+          <LayoutGrid className="w-5 h-5 text-white/70" />
+          <span>Moodboard</span>
+        </button>
       </div>
 
       <div className="flex-1 w-full h-full cursor-crosshair">
@@ -1231,91 +1182,139 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
                 const dy = newY - el.y;
 
                 if (el.type === 'column') {
-                  const updates: { id: string, updates: any }[] = [{ id, updates: { x: newX, y: newY } }];
+                  // Move column
+                  updateElement(id, { x: newX, y: newY });
+                  // Move all children
                   elements.forEach((child: any) => {
                     if (child.parentId === id) {
-                      updates.push({ id: child.id, updates: { x: child.x + dx, y: child.y + dy } });
+                      updateElement(child.id, { x: child.x + dx, y: child.y + dy }, true);
                     }
                   });
-                  updateElements(updates);
                 } else {
+                  // Find if dropped inside a column
                   let newParentId = null;
                   let finalX = newX;
                   let finalY = newY;
+                  
                   const centerX = newX + (el.width || 0) / 2;
                   const centerY = newY + (el.height || 0) / 2;
                   
                   const columns = elements.filter((e: any) => e.type === 'column' && e.id !== id);
-                  const batchUpdates: { id: string, updates: any }[] = [];
-
                   for (const col of columns) {
-                    if (centerX >= col.x && centerX <= col.x + (col.width || 350) &&
-                        centerY >= col.y && centerY <= col.y + (col.height || 100)) {
+                    if (
+                      centerX >= col.x && 
+                      centerX <= col.x + (col.width || 350) &&
+                      centerY >= col.y && 
+                      centerY <= col.y + (col.height || 100)
+                    ) {
                       newParentId = col.id;
+                      
+                      // Auto-snap logic (Organizar em Pilha behavior)
                       const children = elements.filter((e: any) => e.parentId === col.id && e.id !== id);
-                      let currentY = col.y + 110;
+                      let currentY = col.y + 110; // increased space for longer descriptions
                       const marginX = 20;
                       const spacing = 20;
                       const colWidth = col.width || 350;
-                      children.forEach((child: any) => { currentY += (child.height || 100) + spacing; });
+
+                      children.forEach((child: any) => {
+                        currentY += (child.height || 100) + spacing;
+                      });
+
                       const w = el.width || 100;
                       const h = el.height || 100;
                       const ratio = h / w;
                       const newWidth = colWidth - marginX * 2;
                       const newHeight = newWidth * ratio;
+                      
                       finalX = col.x + marginX;
                       finalY = currentY;
-                      batchUpdates.push({ id: col.id, updates: { height: (finalY + newHeight) - col.y + spacing } });
-                      batchUpdates.push({ id, updates: { x: finalX, y: finalY, width: newWidth, height: newHeight, parentId: newParentId } });
+                      
+                      const itemBottom = finalY + newHeight;
+                      updateElement(col.id, { height: itemBottom - col.y + spacing }, true);
+                      
+                      updateElement(id, { x: finalX, y: finalY, width: newWidth, height: newHeight, parentId: newParentId });
                       break;
                     }
                   }
                   
                   if (!newParentId) {
-                    batchUpdates.push({ id, updates: { x: newX, y: newY, parentId: null } });
+                    updateElement(id, { x: newX, y: newY, parentId: null });
                   }
-
-                  // Update connected arrows in the same batch
-                  elements.forEach((arrow: any) => {
-                    if (arrow.type === 'arrow' && (arrow.startId === id || arrow.endId === id)) {
-                      const pts = [...(arrow.points || [])];
-                      if (arrow.startId === id) { pts[0] = newX + (el?.width || 0) / 2; pts[1] = newY + (el?.height || 0) / 2; }
-                      if (arrow.endId === id) { pts[4] = newX + (el?.width || 0) / 2; pts[5] = newY + (el?.height || 0) / 2; }
-                      batchUpdates.push({ id: arrow.id, updates: { points: pts } });
-                    }
-                  });
-
-                  updateElements(batchUpdates);
                 }
+
+                // Update connected arrows
+                elements.forEach((arrow: any) => {
+                  if (arrow.type === 'arrow' && (arrow.startId === id || arrow.endId === id)) {
+                    const pts = [...(arrow.points || [])];
+                    if (arrow.startId === id) { pts[0] = newX + (el?.width || 0) / 2; pts[1] = newY + (el?.height || 0) / 2; }
+                    if (arrow.endId === id) { pts[4] = newX + (el?.width || 0) / 2; pts[5] = newY + (el?.height || 0) / 2; }
+                    updateElement(arrow.id, { points: pts }, true);
+                  }
+                });
               }
             }
           }}
         >
           <Layer>
-            {sortedElements.map((el: any) => (
-              <WhiteboardElement
-                key={el.id}
-                el={el}
-                elements={elements}
-                isSelected={selectedIds.includes(el.id)}
-                tool={tool}
-                editingTextId={editingTextId}
-                editingItemIdx={editingItemIdx}
-                setEditingTextId={setEditingTextId}
-                setEditValue={setEditValue}
-                setEditingItemIdx={setEditingItemIdx}
-                setEditingElementDragging={setIsDraggingElement}
-                setSelectedIds={setSelectedIds}
-                setItemEditValue={setItemEditValue}
-                setPlayingYoutubeId={setPlayingYoutubeId}
-                updateElement={updateElement}
-                stageProps={stageProps}
-                stageRef={stageRef}
-                onRegisterVideo={registerVideo}
-                onUnregisterVideo={unregisterVideo}
-                onOpenColorPicker={(id: string, color: string, x: number, y: number) => setFloatingColorPicker({ id, color, x, y })}
-              />
-            ))}
+            {(() => {
+              const sorted = [...elements].sort((a: any, b: any) => {
+                if (a.type === 'column' && b.type !== 'column') return -1;
+                if (a.type !== 'column' && b.type === 'column') return 1;
+                return 0;
+              });
+              return sorted;
+            })().map((el: any) => {
+              const isSelected = selectedIds.includes(el.id);
+              const dragProps = {
+                draggable: tool === 'select' && !el.locked,
+                onDragStart: () => {
+                  if (tool === 'select' && !isSelected) {
+                    setSelectedIds([el.id]);
+                  }
+                }
+              };
+
+              const editableProps = {
+                onDblClick: () => {
+                  if (['text', 'sticky', 'column'].includes(el.type)) {
+                    setEditingTextId(el.id);
+                    setEditValue(['sticky', 'column'].includes(el.type) ? (el.title || '') + '\n' + (el.body || '') : el.text);
+                  }
+                },
+                onDblTap: () => {
+                  if (['text', 'sticky', 'column'].includes(el.type)) {
+                    setEditingTextId(el.id);
+                    setEditValue(['sticky', 'column'].includes(el.type) ? (el.title || '') + '\n' + (el.body || '') : el.text);
+                  }
+                },
+              };
+
+              if (el.type === 'path') return <Line key={el.id} id={`el-${el.id}`} points={el.points} stroke={el.stroke} strokeWidth={el.strokeWidth} tension={0.5} lineCap="round" lineJoin="round" {...dragProps} />;
+              if (el.type === 'highlighter') return <Line key={el.id} id={`el-${el.id}`} points={el.points} stroke={el.stroke} strokeWidth={el.strokeWidth || 30} tension={0.5} lineCap="square" lineJoin="round" opacity={0.4} {...dragProps} />;
+
+              return (
+                <WhiteboardElement
+                  key={el.id}
+                  el={el}
+                  elements={elements}
+                  isSelected={isSelected}
+                  tool={tool}
+                  dragProps={dragProps}
+                  editableProps={editableProps}
+                  editingTextId={editingTextId}
+                  editingItemIdx={editingItemIdx}
+                  setEditingTextId={setEditingTextId}
+                  setEditValue={setEditValue}
+                  setEditingItemIdx={setEditingItemIdx}
+                  setItemEditValue={setItemEditValue}
+                  setPlayingYoutubeId={setPlayingYoutubeId}
+                  updateElement={updateElement}
+                  stageProps={stageProps}
+                  stageRef={stageRef}
+                  onOpenColorPicker={(id: string, color: string, x: number, y: number) => setFloatingColorPicker({ id, color, x, y })}
+                />
+              );
+            })}
 
             {currentLine && currentLine.type === 'path' && <Line points={currentLine.points} stroke={currentLine.stroke} strokeWidth={currentLine.strokeWidth} tension={0.5} lineCap="round" lineJoin="round" />}
             {currentLine && currentLine.type === 'highlighter' && <Line points={currentLine.points} stroke={currentLine.stroke} strokeWidth={currentLine.strokeWidth} tension={0.5} lineCap="square" lineJoin="round" opacity={0.4} />}
@@ -1753,26 +1752,13 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
         >
           <Redo2 className="w-5 h-5" />
         </button>
-
-        <div className="w-px h-8 bg-white/10 mx-1" />
-
-        <button
-          onClick={exportPdf}
-          className="bg-[#FF4500] text-white hover:bg-[#FF4500]/80 h-10 px-6 rounded-xl flex items-center text-[11px] uppercase tracking-widest font-black transition-all shadow-xl shadow-[#FF4500]/20 ml-2"
-        >
-          <Download className="w-4 h-4 mr-2" /> EXPORTAR PDF
-        </button>
       </div>
 
       {/* Contextual Floating Toolbar */}
       <AnimatePresence>
-        {selectedIds.length > 0 && showMenuDelayed && !isDraggingElement && (() => {
+        {selectedIds.length > 0 && (() => {
           const els = elements.filter(el => selectedIds.includes(el.id));
           if (els.length === 0) return null;
-
-          // HIDE floating menu for images/videos/media
-          const allMedia = els.every(el => ['image', 'video', 'gif', 'youtube'].includes(el.type));
-          if (allMedia) return null;
 
           let minX = Infinity;
           let maxX = -Infinity;
@@ -1818,21 +1804,17 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
                 if (['text', 'sticky', 'checklist'].includes(firstEl?.type)) {
                   return (
                     <div className="flex items-center gap-1 px-1 border-r border-gray-200">
-                    <div className="flex flex-col gap-1 px-2 mr-1">
-                      <div className="flex justify-between items-center w-full">
-                        <span className="text-[9px] font-black text-gray-400">SIZE</span>
-                        <span className="text-[10px] font-black text-gray-700">{activeFontSize}px</span>
+                      <div className="flex items-center bg-gray-100 rounded-lg px-2 mr-1">
+                        <input
+                          type="number" value={activeFontSize}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 8;
+                            setActiveFontSize(val);
+                            selectedIds.forEach(id => updateElement(id, { fontSize: val }));
+                          }}
+                          className="w-10 bg-transparent border-none text-[13px] font-bold text-gray-700 outline-none py-1"
+                        />
                       </div>
-                      <input
-                        type="range" min="8" max="200" value={activeFontSize}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 8;
-                          setActiveFontSize(val);
-                          selectedIds.forEach(id => updateElement(id, { fontSize: val }));
-                        }}
-                        className="premium-slider !bg-gray-200 w-24"
-                      />
-                    </div>
                       <button
                         onClick={() => {
                           selectedIds.forEach(id => {
@@ -1937,11 +1919,31 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
                     </div>
                   );
                 }
-                return null;
+
+                if (['image', 'video'].includes(firstEl?.type)) {
+                  return (
+                    <div className="flex items-center gap-1 px-1 border-r border-gray-200">
+                      <button
+                        onClick={() => open()}
+                        className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 flex items-center gap-2 text-[12px] font-bold"
+                      >
+                        <RefreshCw className="w-4 h-4" /> REPLACE
+                      </button>
+                    </div>
+                  );
+                }
               })()}
 
               {/* Common Actions */}
               <div className="flex items-center gap-1 px-1">
+                <button
+                  onClick={() => {
+                    selectedIds.forEach(id => updateElement(id, { locked: !elements.find(e => e.id === id)?.locked }));
+                  }}
+                  className={`p-2 rounded-lg transition-colors ${selectedIds.some(id => elements.find(e => e.id === id)?.locked) ? 'text-[#00A1FF] bg-[#00A1FF]/10' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  {selectedIds.some(id => elements.find(e => e.id === id)?.locked) ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                </button>
                 <button
                   onClick={() => {
                     selectedIds.forEach(id => removeElement(id));
@@ -1989,19 +1991,6 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
                   className="px-4 py-2 hover:bg-white/5 text-left flex items-center gap-3 font-bold text-[11px] tracking-wider uppercase"
                 >
                   <ArrowDownSquare className="w-4 h-4" /> ENVIAR PARA TRÁS
-                </button>
-                <button
-                  onClick={() => {
-                    selectedIds.forEach(id => updateElement(id, { locked: !elements.find(e => e.id === id)?.locked }));
-                    setContextMenu(null);
-                  }}
-                  className="px-4 py-2 hover:bg-white/5 text-left flex items-center gap-3 font-bold text-[11px] tracking-wider uppercase"
-                >
-                  {selectedIds.some(id => elements.find(e => e.id === id)?.locked) ? (
-                    <><Lock className="w-4 h-4 text-[#00A1FF]" /> DESBLOQUEAR</>
-                  ) : (
-                    <><Unlock className="w-4 h-4" /> BLOQUEAR POSIÇÃO</>
-                  )}
                 </button>
 
                 {selectedIds.length > 1 && (
@@ -2109,66 +2098,16 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
                 <div className="h-px bg-white/5 my-1 mx-2" />
                 
                 {selectedIds.length === 1 && elements.find(el => el.id === selectedIds[0])?.type === 'image' && (
-                  <>
-                    <button
-                      onClick={() => {
-                        const imgEl = elements.find(el => el.id === selectedIds[0]);
-                        if (imgEl) updateProject({ coverUrl: imgEl.url });
-                        setContextMenu(null);
-                      }}
-                      className="px-4 py-2 hover:bg-white/5 text-left flex items-center gap-3 font-bold text-[11px] tracking-wider uppercase"
-                    >
-                      <LayoutGrid className="w-4 h-4" /> USAR COMO CAPA
-                    </button>
-                    <button
-                      onClick={() => { open(); setContextMenu(null); }}
-                      className="px-4 py-2 hover:bg-white/5 text-left flex items-center gap-3 font-bold text-[11px] tracking-wider uppercase"
-                    >
-                      <RefreshCw className="w-4 h-4" /> SUBSTITUIR IMAGEM
-                    </button>
-                  </>
-                )}
-
-                {selectedIds.length === 1 && elements.find(el => el.id === selectedIds[0])?.type === 'video' && (
-                  <>
-                    <button
-                      onClick={() => {
-                        const videoEl = videoElementsRef.current.get(selectedIds[0]);
-                        const element = elements.find(el => el.id === selectedIds[0]);
-                        if (videoEl && element) {
-                          const canvas = document.createElement('canvas');
-                          canvas.width = videoEl.videoWidth;
-                          canvas.height = videoEl.videoHeight;
-                          const ctx = canvas.getContext('2d');
-                          ctx?.drawImage(videoEl, 0, 0);
-                          const dataUrl = canvas.toDataURL('image/webp', 0.9);
-                          
-                          addElement({
-                            id: Date.now().toString(),
-                            type: 'image',
-                            x: element.x + 40,
-                            y: element.y + 40,
-                            width: element.width,
-                            height: element.height,
-                            url: dataUrl,
-                            rotation: element.rotation,
-                            scaleX: element.scaleX,
-                            scaleY: element.scaleY
-                          });
-                        }
-                        setContextMenu(null);
-                      }}
-                      className="px-4 py-2 hover:bg-[#FF4500]/10 text-[#FF4500] text-left flex items-center gap-3 font-bold text-[11px] tracking-wider uppercase"
-                    >
-                      <Maximize className="w-4 h-4" /> EXPORTAR FRAME (PARA PDF)
-                    </button>
-                    <button
-                      onClick={() => { open(); setContextMenu(null); }}
-                      className="px-4 py-2 hover:bg-white/5 text-left flex items-center gap-3 font-bold text-[11px] tracking-wider uppercase"
-                    >
-                      <RefreshCw className="w-4 h-4" /> SUBSTITUIR VÍDEO
-                    </button>
-                  </>
+                  <button
+                    onClick={() => {
+                      const imgEl = elements.find(el => el.id === selectedIds[0]);
+                      if (imgEl) updateProject({ coverUrl: imgEl.url });
+                      setContextMenu(null);
+                    }}
+                    className="px-4 py-2 hover:bg-white/5 text-left flex items-center gap-3 font-bold text-[11px] tracking-wider uppercase"
+                  >
+                    <LayoutGrid className="w-4 h-4" /> USAR COMO CAPA
+                  </button>
                 )}
 
                 <div className="h-px bg-white/5 my-1 mx-2" />
@@ -2357,6 +2296,53 @@ export default function Whiteboard({ project, elements = [], addElement, addElem
         )}
       </AnimatePresence>
 
+      {/* Minimap & Toggle */}
+      <div className="absolute bottom-24 right-6 z-40 flex flex-col items-end gap-2 pointer-events-auto">
+        <AnimatePresence>
+          {showMinimap && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-[#1a1a1a]/80 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden shadow-2xl pointer-events-none"
+              style={{ width: minimapSize, height: minimapSize }}
+            >
+              <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:10px_10px]" />
+              {elements.map(el => (
+                <div
+                  key={el.id}
+                  className="absolute bg-white/40 rounded-sm"
+                  style={{
+                    left: ((el.x || 0) - boardBounds.x) * minimapScale,
+                    top: ((el.y || 0) - boardBounds.y) * minimapScale,
+                    width: Math.max(2, (el.width || 100) * minimapScale),
+                    height: Math.max(2, (el.height || 100) * minimapScale),
+                  }}
+                />
+              ))}
+              {/* Viewport indicator */}
+              <div
+                className="absolute border-2 border-[#FF4500] bg-[#FF4500]/10 rounded-sm shadow-[0_0_10px_rgba(255,69,0,0.3)]"
+                style={{
+                  left: (-stageProps.x / stageProps.scale - boardBounds.x) * minimapScale,
+                  top: (-stageProps.y / stageProps.scale - boardBounds.y) * minimapScale,
+                  width: (window.innerWidth / stageProps.scale) * minimapScale,
+                  height: (window.innerHeight / stageProps.scale) * minimapScale,
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button 
+          onClick={() => setShowMinimap(!showMinimap)}
+          className="bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 p-2.5 rounded-xl shadow-2xl text-white/60 hover:text-white transition-all flex items-center justify-center hover:bg-white/5"
+          title={showMinimap ? "Ocultar Minimap" : "Mostrar Minimap"}
+        >
+          <Map className="w-5 h-5" />
+        </button>
+      </div>
 
       {/* Zoom Controls Panel */}
       <div className="absolute bottom-8 left-8 z-40 flex items-center gap-3 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-2xl shadow-2xl">

@@ -9,7 +9,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
 } from '../components/ui/context-menu';
-
+import { SplashScreen } from '../components/SplashScreen';
 
 export default function Dashboard({ user }: { user: any }) {
   const navigate = useNavigate();
@@ -318,6 +318,7 @@ export default function Dashboard({ user }: { user: any }) {
           </motion.div>
         )}
       </AnimatePresence>
+      <SplashScreen isLoading={loading} />
     </div>
   );
 }

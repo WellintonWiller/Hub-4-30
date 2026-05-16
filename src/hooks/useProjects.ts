@@ -20,7 +20,7 @@ export function useProjects(userId: string | undefined) {
       const projectsWithCovers = await Promise.all(userProjects.map(async (p: any) => {
         const assets: any = await localforage.getItem(`assets_${p.id}`) || [];
         const images = assets.filter((a: any) => a.type === 'image');
-        const coverUrl = images.length > 0 ? (images[0].url || images[0].src) : `https://picsum.photos/seed/${p.id}/800/800`;
+        const coverUrl = p.coverUrl || (images.length > 0 ? (images[0].url || images[0].src) : `https://picsum.photos/seed/${p.id}/800/800`);
         return {
           ...p,
           coverUrl
@@ -60,7 +60,7 @@ export function useProjects(userId: string | undefined) {
     const projectsWithCovers = await Promise.all(userProjects.map(async (p: any) => {
       const assets: any = await localforage.getItem(`assets_${p.id}`) || [];
       const images = assets.filter((a: any) => a.type === 'image');
-      const coverUrl = images.length > 0 ? (images[0].url || images[0].src) : `https://picsum.photos/seed/${p.id}/800/800`;
+      const coverUrl = p.coverUrl || (images.length > 0 ? (images[0].url || images[0].src) : `https://picsum.photos/seed/${p.id}/800/800`);
       return { ...p, coverUrl };
     }));
     
@@ -81,7 +81,7 @@ export function useProjects(userId: string | undefined) {
     const projectsWithCovers = await Promise.all(userProjects.map(async (p: any) => {
       const assets: any = await localforage.getItem(`assets_${p.id}`) || [];
       const images = assets.filter((a: any) => a.type === 'image');
-      const coverUrl = images.length > 0 ? (images[0].url || images[0].src) : `https://picsum.photos/seed/${p.id}/800/800`;
+      const coverUrl = p.coverUrl || (images.length > 0 ? (images[0].url || images[0].src) : `https://picsum.photos/seed/${p.id}/800/800`);
       return { ...p, coverUrl };
     }));
     setProjects(projectsWithCovers);
